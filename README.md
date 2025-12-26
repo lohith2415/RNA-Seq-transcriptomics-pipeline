@@ -108,7 +108,7 @@ The pipeline should be executed in the following order to ensure correct process
 python3 merge.py
 ```
 ## Important 
-Keep the pipeline folder with all the inside the same folder with the sample
+Keep the pipeline folder with all the samples inside the same folder as the sample
 ```
 ran-seqproject/
 |-sample 1
@@ -119,4 +119,4 @@ ran-seqproject/
 python3 merge.py
 ./install_tools.sh
 ```
-Inside the pipeline folder ```./install_tools.sh```, this will create a folder named ```genome_data/``` wherewe  keep the reference genome file and gtf inside this folder, so ```./run_alignment.sh``` will get files from this folder and build an index folder to.
+Inside the pipeline folder ```./install_tools.sh```, this will create a folder named ```genome_data/``` wherewe  keep the reference genome file and gtf inside this folder, so ```./run_alignment.sh``` will get files from this folder and build an index folder.
