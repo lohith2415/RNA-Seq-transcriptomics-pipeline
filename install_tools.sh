@@ -12,6 +12,9 @@ cd "$PIPELINE_DIR"
 
 echo "📁 Pipeline directory: $PIPELINE_DIR"
 
+# Ensure ~/.local/bin is in PATH (for MultiQC)
+export PATH="$HOME/.local/bin:$PATH"
+
 # -------------------------
 # Helper functions
 # -------------------------
@@ -25,6 +28,13 @@ import importlib.util
 exit(0) if importlib.util.find_spec("$1") else exit(1)
 EOF
 }
+
+# -------------------------
+# Create required directories (NORMAL empty folders)
+# -------------------------
+echo "📂 Creating required pipeline directories..."
+mkdir -p hisat2_index genome_data
+echo "✅ Directories ready"
 
 # -------------------------
 # System update
@@ -137,7 +147,13 @@ echo "========================================"
 hisat2 --version | head -n 1
 samtools --version | head -n 1
 fastqc --version
-multiqc --version
+
+if command_exists multiqc; then
+    multiqc --version
+else
+    echo "⚠️ MultiQC installed but not in PATH"
+fi
+
 python3 --version
 java -version
 
