@@ -107,4 +107,16 @@ The pipeline should be executed in the following order to ensure correct process
 ./run_alignment.sh
 python3 merge.py
 ```
-
+## Important 
+Keep the pipeline folder with all the inside the same folder with the sample
+```
+ran-seqproject/
+|-sample 1
+|-sample-2
+|-pipeline-(folder)
+   |-./fastqc_trim.sh
+./run_alignment.sh
+python3 merge.py
+./install_tools.sh
+```
+Inside the pipeline folder ```./install_tools.sh```, this will create a folder named ```genome_data/``` wherewe  keep the reference genome file and gtf inside this folder, so ```./run_alignment.sh``` will get files from this folder and build an index folder to.
