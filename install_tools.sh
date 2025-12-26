@@ -57,7 +57,7 @@ for pkg in "${CORE_PKGS[@]}"; do
 done
 
 # -------------------------
-# Bioinformatics tools
+# Bioinformatics tools (APT)
 # -------------------------
 echo "🧬 Checking bioinformatics tools..."
 
@@ -75,6 +75,28 @@ for tool in "${TOOLS[@]}"; do
         sudo apt install -y "$tool"
     fi
 done
+
+# -------------------------
+# Trimmomatic (local install inside pipeline)
+# -------------------------
+TRIMMO_DIR="$PIPELINE_DIR/Trimmomatic-0.39"
+TRIMMO_ZIP="Trimmomatic-0.39.zip"
+TRIMMO_URL="http://www.usadellab.org/cms/uploads/supplementary/Trimmomatic/$TRIMMO_ZIP"
+
+echo "✂️ Checking Trimmomatic..."
+
+if [[ -d "$TRIMMO_DIR" ]]; then
+    echo "✅ Trimmomatic already present in pipeline"
+else
+    echo "⬇️ Downloading Trimmomatic 0.39..."
+    wget -q "$TRIMMO_URL" -O "$TRIMMO_ZIP"
+
+    echo "📦 Extracting Trimmomatic..."
+    unzip -q "$TRIMMO_ZIP"
+
+    rm -f "$TRIMMO_ZIP"
+    echo "✔ Trimmomatic installed in pipeline folder"
+fi
 
 # -------------------------
 # MultiQC (pip-based)
@@ -119,7 +141,12 @@ multiqc --version
 python3 --version
 java -version
 
+if [[ -f "$TRIMMO_DIR/trimmomatic-0.39.jar" ]]; then
+    echo "Trimmomatic: OK ($TRIMMO_DIR)"
+else
+    echo "❌ Trimmomatic missing"
+fi
+
 echo "========================================"
 echo " ✅ All tools ready. Pipeline can run!"
 echo "========================================"
-
