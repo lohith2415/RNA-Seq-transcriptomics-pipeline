@@ -1,0 +1,72 @@
+Sample Output 
+
+After successfully running the complete RNA-Seq transcriptomics pipeline, multiple output files and directories are generated at different stages of the analysis. These outputs allow users to assess data quality, verify alignment success, and perform downstream gene expression analysis.
+
+Sample-Level Quality Control Output
+
+Following execution of fastqc_trim.sh, FastQC reports are generated for both raw and trimmed reads. These reports are stored within each sample directory and provide visual summaries of read quality, GC content, adapter contamination, and sequence duplication levels. The presence of these reports allows users to confirm whether trimming has improved read quality.
+### sample/
+├── fastqc_raw/
+│   ├── sample_1_fastqc.html
+│   └── sample_2_fastqc.html
+├── trimmed/
+│   ├── sample_1_paired.fastq.gz
+│   ├── sample_2_paired.fastq.gz
+│   ├── sample_1_unpaired.fastq.gz
+│   └── sample_2_unpaired.fastq.gz
+
+The *_fastqc.html files can be opened in a web browser to visually inspect sequencing quality before and after trimming.
+
+Alignment Output Example
+
+After running run_alignment.sh, each sample produces alignment files in BAM format. These files represent reads successfully aligned to the reference genome using HISAT2. The BAM files are sorted and indexed, making them ready for visualization in genome browsers or further processing.
+
+sample/
+├── hisat2/
+│   ├── sample.sorted.bam
+│   └── sample.sorted.bam.bai
+
+
+A higher proportion of aligned reads typically indicates good sequencing quality and an appropriate reference genome.
+
+Gene Count Output Example
+
+For each sample, HTSeq-count generates a gene-level count file. This file contains raw read counts mapped to each gene and serves as the foundation for differential expression analysis.
+
+sample/
+├── htseq_counts/
+│   └── sample_counts.txt
+
+
+A simplified example of a gene count file is shown below:
+
+Gene_ID        sample_001
+AT1G01010      542
+AT1G01020      118
+AT1G01030      0
+AT1G01040      967
+
+
+Each row represents a gene, and the numeric value corresponds to the number of reads mapped to that gene in the given sample.
+
+Merged Expression Matrix Output
+
+After executing merge.py, all individual sample count files are combined into a single expression matrix. This matrix contains gene IDs as rows and samples as columns, making it suitable for downstream statistical analysis.
+
+All_samples_counts.xlsx
+
+
+A simplified representation of the merged matrix is shown below:
+
+Gene_ID        sample_001   sample_002   sample_003
+AT1G01010      542          498          610
+AT1G01020      118          102          95
+AT1G01030      0            4            2
+AT1G01040      967          1003         921
+
+
+This file can be directly imported into tools such as DESeq2, edgeR, or Limma for normalization, differential expression testing, and visualization.
+
+Interpretation of Final Output
+
+The final merged count matrix represents the quantitative gene expression landscape across all samples. Genes with consistently high counts indicate strong expression, while genes with low or zero counts may be weakly expressed or condition-specific. This output enables researchers to compare gene expression patterns between experimental conditions, identify biologically meaningful changes, and perform functional enrichment analyses.
