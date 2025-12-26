@@ -77,6 +77,14 @@ The genome_data directory stores reference genome and annotation files required 
 ├── genome.fa
 └── annotation.gtf
 ```
+## 📁 genome_data/
+
+Contains reference genome files:
+
+Genome FASTA (.fa, .fasta, .fa.gz)
+
+Annotation file (.gtf, .gtf.gz)
+
 
 The hisat2_index directory contains HISAT2 index files generated automatically during alignment. Storing these files avoids rebuilding the index for every run, significantly speeding up the pipeline.
 
