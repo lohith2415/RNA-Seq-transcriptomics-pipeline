@@ -107,3 +107,4 @@ The pipeline should be executed in the following order to ensure correct process
 ./run_alignment.sh
 python3 merge.py
 ```
+
