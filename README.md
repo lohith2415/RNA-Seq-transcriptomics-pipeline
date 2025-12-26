@@ -1,235 +1,91 @@
 RNA-Seq Transcriptomics Pipeline
 
-This repository provides a Linux-based RNA-Seq transcriptomics analysis pipeline that performs end-to-end processing of RNA sequencing data, starting from raw FASTQ files to a merged gene expression count matrix. The pipeline is designed to be reproducible, interactive, and easy to understand for students and researchers.
+This repository provides a Linux-based RNA-Seq transcriptomics analysis pipeline that performs end-to-end processing of RNA sequencing data, starting from raw FASTQ files and ending with a merged gene expression count matrix. The pipeline is designed to be reproducible, interactive, and easy to understand, making it suitable for students, beginners in bioinformatics, and researchers who want a transparent RNA-Seq workflow.
 
-1️⃣ What is RNA-Seq?
+What is RNA-Seq?
 
-RNA sequencing (RNA-Seq) is a high-throughput sequencing technique used to study the transcriptome, i.e., all RNA molecules expressed in a biological sample at a given time.
+RNA sequencing (RNA-Seq) is a high-throughput sequencing technique used to study the transcriptome, which represents all RNA molecules expressed in a biological sample at a specific time and condition. RNA-Seq enables quantitative measurement of gene expression, identification of differentially expressed genes, discovery of novel transcripts and splice variants, and exploration of functional genomics and regulatory mechanisms. A typical RNA-Seq experiment involves RNA isolation, library preparation, sequencing using platforms such as Illumina, quality control of reads, trimming of low-quality sequences and adapters, alignment of reads to a reference genome, gene-level read counting, and downstream statistical analysis using tools such as DESeq2 or edgeR. This repository focuses on the computational steps starting from quality control up to gene-level read counting.
 
-RNA-Seq allows us to:
+Getting Raw RNA-Seq Data from NCBI
 
-Measure gene expression levels
+Public RNA-Seq datasets can be obtained from the NCBI Sequence Read Archive (SRA). A typical workflow involves identifying a project accession such as PRJNA394193, installing the SRA Toolkit, and downloading sequencing data in FASTQ format. The following command can be used to download paired-end reads and convert them into FASTQ files:
 
-Identify differentially expressed genes
-
-Discover novel transcripts and splice variants
-
-Study functional genomics and regulatory mechanisms
-
-Typical RNA-Seq workflow:
-
-RNA isolation
-
-Library preparation
-
-Sequencing (Illumina, etc.)
-
-Quality control
-
-Read trimming
-
-Alignment to a reference genome
-
-Gene-level read counting
-
-Downstream statistical analysis (DESeq2, edgeR, etc.)
-
-This repository covers steps 4–7.
-
-2️⃣ Getting Raw RNA-Seq Data from NCBI
-
-Public RNA-Seq datasets can be downloaded from NCBI Sequence Read Archive (SRA).
-
-Example workflow:
-
-Identify a project (e.g., PRJNA394193)
-
-Install SRA Toolkit
-
-Download and convert data to FASTQ format
-
-fasterq-dump SRRXXXXXXX --split-files --threads 8
+```fasterq-dump SRRXXXXXXX --split-files --threads 8```
 
 
-This pipeline assumes that each sample has its own folder containing paired-end FASTQ files:
+This pipeline assumes that each biological sample is organized in a separate directory containing paired-end FASTQ files. The expected directory layout is shown below:
 
-PROJECT_DIR/
+```PROJECT_DIR/
 ├── 001/
 │   ├── sample_1.fastq.gz
 │   └── sample_2.fastq.gz
 ├── 002/
 │   ├── sample_1.fastq.gz
 │   └── sample_2.fastq.gz
+```
 
-3️⃣ install_tools.sh – Tool Installation & Setup
+Each subdirectory represents one sample, where the _1.fastq.gz and _2.fastq.gz files correspond to forward and reverse reads respectively.
 
-This script prepares the system and pipeline environment.
+install_tools.sh – Tool Installation and Setup
 
-What it does:
+The install_tools.sh script is responsible for preparing the system and pipeline environment. It updates the system package list and installs all core dependencies such as Java, Python, wget, unzip, and other required utilities. The script also installs essential bioinformatics tools including HISAT2 for read alignment, SAMtools for processing SAM and BAM files, FastQC for read quality assessment, and MultiQC for summarizing quality control reports. In addition, it downloads and installs Trimmomatic version 0.39 locally inside the pipeline directory and creates the required folders named genome_data and hisat2_index. This script ensures reproducibility, prevents manual dependency-related errors, and can be safely executed multiple times without affecting existing installations. The script needs to be run once before starting the analysis:
 
-Updates system package list
+```./install_tools.sh```
 
-Installs core dependencies (Java, Python, wget, unzip, etc.)
+fastqc_trim.sh – Quality Control and Trimming
 
-Installs bioinformatics tools:
+The fastqc_trim.sh script performs quality assessment and optional trimming of raw RNA-Seq reads. It automatically detects paired-end FASTQ files within each sample directory and runs FastQC to evaluate the quality of the raw reads. After the initial quality assessment, the script pauses and asks the user whether trimming should be performed. If the user agrees, Trimmomatic is executed to remove adapter sequences and low-quality bases, followed by another round of FastQC on the trimmed reads. This interactive design allows users to inspect read quality before trimming. The outputs generated by this script are organized within each sample directory as shown below:
 
-HISAT2 (read alignment)
-
-SAMtools (BAM/SAM processing)
-
-FastQC (quality control)
-
-MultiQC (QC summarization)
-
-Downloads and installs Trimmomatic (v0.39) locally inside the pipeline folder
-
-Creates required directories:
-
-genome_data/
-
-hisat2_index/
-
-Why this script is important:
-
-Ensures reproducibility
-
-Avoids manual dependency errors
-
-Safe to run multiple times
-
-Run once:
-
-./install_tools.sh
-
-4️⃣ fastqc_trim.sh – Quality Control & Trimming
-
-This script performs quality control and optional trimming on raw sequencing reads.
-
-Step-by-step actions:
-
-Automatically detects paired-end FASTQ files
-
-Runs FastQC on raw reads
-
-Pauses and asks the user whether trimming should be performed
-
-If approved:
-
-Runs Trimmomatic for adapter and quality trimming
-
-Runs FastQC again on trimmed reads
-
-Key features:
-
-Interactive (user-controlled trimming)
-
-Automatic sample detection
-
-Per-sample output organization
-
-Prevents reprocessing of completed samples
-
-Outputs are stored inside each sample folder:
-
-sample/
+```sample/
 ├── fastqc_raw/
 ├── trimmed/
 │   ├── *_paired.fastq.gz
 │   └── *_unpaired.fastq.gz
+```
 
-5️⃣ run_alignment.sh – Alignment & Read Counting
 
-This script aligns trimmed reads to the reference genome and generates gene-level counts.
+This approach ensures clean organization of results, automatic sample handling, and prevents reprocessing of samples that have already been analyzed.
 
-Major steps:
+```run_alignment.sh – Alignment and Read Counting```
 
-Automatically detects:
+The run_alignment.sh script aligns trimmed reads to a reference genome and generates gene-level expression counts. It automatically detects the genome FASTA file and the corresponding GTF annotation from the genome_data directory. If a HISAT2 index is not already present, the script builds it and stores it in the hisat2_index directory. Trimmed reads are then aligned using HISAT2, and the resulting SAM files are converted into sorted and indexed BAM files. Finally, HTSeq-count is used to calculate gene-level read counts. The output produced by this script is structured as follows:
 
-Genome FASTA
-
-GTF annotation
-
-Builds HISAT2 index (if not already present)
-
-Aligns trimmed reads using HISAT2
-
-Converts SAM → sorted BAM
-
-Indexes BAM files
-
-Performs HTSeq-count to generate gene expression counts
-
-Output structure:
-sample/
+````sample/
 ├── hisat2/
 │   └── sample.sorted.bam
 ├── htseq_counts/
 │   └── sample_counts.txt
+````
 
 
-This script ensures:
+This design avoids redundant index rebuilding, skips alignment if BAM files already exist, and maintains a clean and organized directory structure.
 
-No redundant index rebuilding
+merge.py – Merging Count Files
 
-No re-alignment if BAM already exists
+The merge.py script is a Python utility that combines individual sample-level count files into a single gene expression matrix. It automatically detects sample directories, reads HTSeq count files from each sample, and merges them based on gene identifiers. The final output is written as an Excel file named:
 
-Clean and organized outputs
-
-6️⃣ merge.py – Merge Count Files
-
-This Python script merges individual sample count files into a single expression matrix.
-
-What it does:
-
-Automatically detects sample folders
-
-Reads HTSeq count files from each sample
-
-Merges all counts by gene ID
-
-Exports a single Excel file
-
-Final output:
-All_samples_counts.xlsx
+```All_samples_counts.xlsx```
 
 
-This file can be directly used for:
+This merged count matrix can be directly used for downstream differential expression analysis using tools such as DESeq2, edgeR, Limma, or other transcriptomic analysis frameworks.
 
-DESeq2
+Folder Descriptions
 
-edgeR
+The genome_data directory stores reference genome and annotation files required for alignment and read counting. These typically include a genome FASTA file and a GTF annotation file, as shown below:
 
-Limma
-
-Other downstream transcriptomic analyses
-
-7️⃣ Folder Descriptions
-📁 genome_data/
-
-Contains reference genome files:
-
-Genome FASTA (.fa, .fasta, .fa.gz)
-
-Annotation file (.gtf, .gtf.gz)
-
-Example:
-
-genome_data/
+```genome_data/
 ├── genome.fa
 └── annotation.gtf
+```
 
-📁 hisat2_index/
+The hisat2_index directory contains HISAT2 index files generated automatically during alignment. Storing these files avoids rebuilding the index for every run, significantly speeding up the pipeline.
 
-Stores HISAT2 genome index files (*.ht2) generated automatically.
+Recommended Pipeline Execution Order
 
-Purpose:
+The pipeline should be executed in the following order to ensure correct processing:
 
-Speeds up alignment
-
-Avoids rebuilding index every run
-
-8️⃣ Recommended Pipeline Execution Order
-./install_tools.sh
+```./install_tools.sh
 ./fastqc_trim.sh
 ./run_alignment.sh
 python3 merge.py
+```
