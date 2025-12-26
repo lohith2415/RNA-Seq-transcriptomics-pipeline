@@ -1,0 +1,6 @@
+Trimmomatic-0.39/
+genome_data/
+hisat2_index/
+*.log
+*.out
+*.tmp
