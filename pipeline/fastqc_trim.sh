@@ -1,7 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# Run this inside pipeline/
+# -------------------------
+# Paths and variables
+# -------------------------
 PIPELINE_DIR="$(pwd)"
 PROJECT_DIR="$(dirname "$PIPELINE_DIR")"
 
@@ -11,7 +13,9 @@ TRIMMOMATIC_JAR="$PIPELINE_DIR/Trimmomatic-0.39/trimmomatic-0.39.jar"
 THREADS=${THREADS:-4}
 MINLEN=36
 
-# Check paths
+# -------------------------
+# Sanity checks
+# -------------------------
 [[ -f "$ADAPTERS" ]] || { echo "❌ Adapter file missing"; exit 1; }
 [[ -f "$TRIMMOMATIC_JAR" ]] || { echo "❌ Trimmomatic JAR missing"; exit 1; }
 
@@ -20,19 +24,19 @@ echo "🔍 Project directory:  $PROJECT_DIR"
 echo "🔍 Threads:            $THREADS"
 echo
 
-###############################################
-# Function: Detect read pair automatically
-###############################################
+# -------------------------
+# Function: detect R1/R2
+# -------------------------
 find_pair() {
   local dir="$1"
-  R1=$(find "$dir" -maxdepth 1 -type f \( -iname "*1*.fastq*" -o -iname "*r1*.fastq*" -o -iname "*1*.fq*" -o -iname "*r1*.fq*" \) | head -n1 || true)
-  R2=$(find "$dir" -maxdepth 1 -type f \( -iname "*2*.fastq*" -o -iname "*r2*.fastq*" -o -iname "*2*.fq*" -o -iname "*r2*.fq*" \) | head -n1 || true)
+  R1=$(ls "$dir"/*_1.fastq.gz 2>/dev/null | head -n1 || true)
+  R2=$(ls "$dir"/*_2.fastq.gz 2>/dev/null | head -n1 || true)
   printf "%s\n%s\n" "$R1" "$R2"
 }
 
-###############################################
-# LOOP THROUGH SAMPLES
-###############################################
+# -------------------------
+# Loop through samples
+# -------------------------
 for sample_dir in "$PROJECT_DIR"/*/; do
   sample=$(basename "$sample_dir")
 
@@ -44,79 +48,73 @@ for sample_dir in "$PROJECT_DIR"/*/; do
   echo "----------------------------------------------"
   echo "📁 Sample: $sample"
 
-  ###############################################
-  # Detect raw read pairs
-  ###############################################
   readpair=$(find_pair "$sample_dir")
   R1=$(echo "$readpair" | sed -n '1p')
   R2=$(echo "$readpair" | sed -n '2p')
 
   if [[ -z "$R1" || -z "$R2" ]]; then
-    echo "❌ No FASTQ pair found in $sample_dir"
+    echo "❌ No FASTQ pair found — skipping"
     continue
   fi
 
   echo "📌 Raw R1: $R1"
   echo "📌 Raw R2: $R2"
 
-  ###############################################
-  # STEP 1: FastQC on RAW reads
-  ###############################################
+  # -------------------------
+  # STEP 1: FastQC on RAW
+  # -------------------------
   raw_qc_dir="$sample_dir/fastqc_raw"
   mkdir -p "$raw_qc_dir"
 
-  if [[ -f "$raw_qc_dir/$(basename "$R1" .fastq.gz)_fastqc.html" ]]; then
-      echo "⏭ Raw FastQC already exists — skipping"
+  raw_qc_html="$raw_qc_dir/$(basename "$R1" .fastq.gz)_fastqc.html"
+
+  if [[ -f "$raw_qc_html" ]]; then
+    echo "⏭ Raw FastQC already present — skipping FastQC"
   else
-      echo "🔍 Running FastQC on RAW reads..."
-      fastqc -t "$THREADS" "$R1" "$R2" --outdir "$raw_qc_dir"
-      echo "✔ Raw FastQC completed"
+    echo "🔍 Running FastQC on RAW reads..."
+    fastqc -t "$THREADS" "$R1" "$R2" --outdir "$raw_qc_dir"
+    echo "✔ Raw FastQC completed"
   fi
 
-  ###############################################
-  # PAUSE: Ask user
-  ###############################################
-  echo
-  read -p "▶ Press ENTER to run trimming for sample '$sample' (or type 'n' to skip): " choice
-  if [[ "$choice" =~ ^[Nn]$ ]]; then
-      echo "⏭ Skipping trimming for $sample"
-      continue
-  fi
-
-  ###############################################
+  # -------------------------
   # STEP 2: Trimming
-  ###############################################
+  # -------------------------
   trimmed_dir="$sample_dir/trimmed"
   mkdir -p "$trimmed_dir"
 
   out_paired_R1="$trimmed_dir/${sample}_1_paired.fastq.gz"
-  out_unpaired_R1="$trimmed_dir/${sample}_1_unpaired.fastq.gz"
   out_paired_R2="$trimmed_dir/${sample}_2_paired.fastq.gz"
-  out_unpaired_R2="$trimmed_dir/${sample}_2_unpaired.fastq.gz"
 
-  echo "✂️ Running Trimmomatic..."
-  java -jar "$TRIMMOMATIC_JAR" PE \
-    -threads "$THREADS" \
-    "$R1" "$R2" \
-    "$out_paired_R1" "$out_unpaired_R1" \
-    "$out_paired_R2" "$out_unpaired_R2" \
-    ILLUMINACLIP:"$ADAPTERS":2:30:10 \
-    LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:$MINLEN
+  if [[ -f "$out_paired_R1" && -f "$out_paired_R2" ]]; then
+    echo "⏭ Trimmed files already present — skipping trimming"
+  else
+    echo "✂️ Running Trimmomatic..."
 
-  echo "✔ Trimming completed"
+    java -jar "$TRIMMOMATIC_JAR" PE -phred33 \
+      -threads "$THREADS" \
+      "$R1" "$R2" \
+      "$trimmed_dir/${sample}_1_paired.fastq.gz" "$trimmed_dir/${sample}_1_unpaired.fastq.gz" \
+      "$trimmed_dir/${sample}_2_paired.fastq.gz" "$trimmed_dir/${sample}_2_unpaired.fastq.gz" \
+      ILLUMINACLIP:"$ADAPTERS":2:30:10 \
+      LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:$MINLEN
 
-  ###############################################
-  # STEP 3: FastQC on TRIMMED reads
-  ###############################################
-  echo "🔍 Running FastQC on trimmed reads..."
-  fastqc -t "$THREADS" \
-    "$out_paired_R1" "$out_paired_R2" \
-    --outdir "$trimmed_dir"
+    echo "✔ Trimming completed"
+  fi
 
-  echo "✔ Trimmed FastQC completed"
+  # -------------------------
+  # STEP 3: FastQC on TRIMMED
+  # -------------------------
+  trimmed_qc_html="$trimmed_dir/$(basename "$out_paired_R1" .fastq.gz)_fastqc.html"
+
+  if [[ -f "$trimmed_qc_html" ]]; then
+    echo "⏭ Trimmed FastQC already present — skipping"
+  else
+    echo "🔍 Running FastQC on trimmed reads..."
+    fastqc -t "$THREADS" "$out_paired_R1" "$out_paired_R2" --outdir "$trimmed_dir"
+    echo "✔ Trimmed FastQC completed"
+  fi
 
 done
 
 echo
-echo "🎉 Pipeline step completed: FastQC → optional trimming → FastQC"
-
+echo "🎉 Pipeline finished (resume-safe mode)"
