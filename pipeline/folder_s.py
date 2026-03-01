@@ -7,12 +7,15 @@ import shutil
 # Project directory (one level above pipeline)
 project_dir = os.path.abspath(os.path.join(os.getcwd(), ".."))
 
-# Match SRR + read number
-pattern = re.compile(r'(SRR\d+)_(\d)\.fastq\.gz')
+# Updated pattern:
+# Matches:
+# SRR9036794_1.fastq.gz
+# SRR9036794_GSMxxxx_..._1.fastq.gz
+# Galaxy files containing SRRxxxxx_1.fastq.gz
+pattern = re.compile(r'(SRR\d+).*?_(\d)\.fastq\.gz')
 
 print(f"\n🔍 Scanning project directory: {project_dir}")
 
-# Walk through project directory and subfolders
 for root, dirs, files in os.walk(project_dir):
 
     # Skip pipeline folder
@@ -21,7 +24,7 @@ for root, dirs, files in os.walk(project_dir):
 
     for file in files:
 
-        if not file.endswith(".gz"):
+        if not file.endswith(".fastq.gz") and not file.endswith(".gz"):
             continue
 
         match = pattern.search(file)
@@ -37,11 +40,11 @@ for root, dirs, files in os.walk(project_dir):
             new_name = f"{srr}_{read}.fastq.gz"
             new_path = os.path.join(correct_folder, new_name)
 
-            # If file already correct and in correct place
+            # If already correct
             if old_path == new_path:
                 continue
 
-            # Remove duplicates like (1)
+            # Remove duplicate if target exists
             if os.path.exists(new_path):
                 print(f"⚠ Duplicate found — removing {old_path}")
                 os.remove(old_path)
