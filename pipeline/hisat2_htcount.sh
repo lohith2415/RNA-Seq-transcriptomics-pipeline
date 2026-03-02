@@ -21,28 +21,46 @@ echo
 mkdir -p "$INDEX_DIR"
 
 ###########################################
-# 1️⃣ DETECT GENOME FASTA
+# 1️⃣ DETECT GENOME FASTA (SUPPORT .gz)
 ###########################################
 
 FASTA=$(find "$GENOME_DIR" -maxdepth 1 -type f \
-    \( -iname "*.fa" -o -iname "*.fasta" -o -iname "*.fna" \) | head -n1 || true)
+    \( -iname "*.fa" -o -iname "*.fasta" -o -iname "*.fna" \
+       -o -iname "*.fa.gz" -o -iname "*.fasta.gz" -o -iname "*.fna.gz" \) \
+    | head -n1 || true)
 
 if [[ -z "$FASTA" ]]; then
     echo "❌ No FASTA found in genome_data"
     exit 1
 fi
 
+# If gzipped → decompress once
+if [[ "$FASTA" == *.gz ]]; then
+    echo "📦 Decompressing genome FASTA..."
+    gunzip -kf "$FASTA"
+    FASTA="${FASTA%.gz}"
+fi
+
 echo "✔ Genome FASTA: $(basename "$FASTA")"
 
 ###########################################
-# 2️⃣ DETECT GTF
+# 2️⃣ DETECT GTF (SUPPORT .gz)
 ###########################################
 
-GTF=$(find "$GENOME_DIR" -maxdepth 1 -type f -iname "*.gtf" | head -n1 || true)
+GTF=$(find "$GENOME_DIR" -maxdepth 1 -type f \
+    \( -iname "*.gtf" -o -iname "*.gtf.gz" \) \
+    | head -n1 || true)
 
 if [[ -z "$GTF" ]]; then
     echo "❌ No GTF found in genome_data"
     exit 1
+fi
+
+# If gzipped → decompress once
+if [[ "$GTF" == *.gz ]]; then
+    echo "📦 Decompressing GTF..."
+    gunzip -kf "$GTF"
+    GTF="${GTF%.gz}"
 fi
 
 echo "✔ GTF: $(basename "$GTF")"
@@ -90,12 +108,18 @@ for sample_dir in "$PROJECT_DIR"/SRR*/; do
         continue
     fi
 
+    # Quick integrity check
+    if ! gzip -t "$R1" 2>/dev/null || ! gzip -t "$R2" 2>/dev/null; then
+        echo "❌ Corrupted FASTQ detected — skipping sample"
+        continue
+    fi
+
     BAM="$hisat_dir/${sample}.sorted.bam"
     SAM="$hisat_dir/${sample}.sam"
     COUNT_FILE="$count_dir/${sample}_counts.txt"
 
     ###########################################
-    # HISAT2 ALIGNMENT (SKIP IF BAM EXISTS)
+    # HISAT2 ALIGNMENT
     ###########################################
 
     if [[ -f "$BAM" ]]; then
@@ -103,11 +127,14 @@ for sample_dir in "$PROJECT_DIR"/SRR*/; do
     else
         echo "🧬 Running HISAT2..."
 
-        hisat2 -p "$THREADS" \
+        if ! hisat2 -p "$THREADS" \
             -x "$INDEX_PREFIX" \
             -1 "$R1" \
             -2 "$R2" \
-            -S "$SAM"
+            -S "$SAM"; then
+            echo "❌ HISAT2 failed — skipping sample"
+            continue
+        fi
 
         echo "🔄 Sorting BAM..."
         samtools sort -@ "$THREADS" -o "$BAM" "$SAM"
@@ -119,7 +146,7 @@ for sample_dir in "$PROJECT_DIR"/SRR*/; do
     fi
 
     ###########################################
-    # HTSEQ COUNT (SKIP IF COUNT EXISTS)
+    # HTSEQ COUNT
     ###########################################
 
     if [[ -f "$COUNT_FILE" ]]; then
@@ -127,14 +154,17 @@ for sample_dir in "$PROJECT_DIR"/SRR*/; do
     else
         echo "🧮 Running HTSeq-count..."
 
-        htseq-count \
+        if ! htseq-count \
             -f bam \
             -r pos \
             -s no \
             -t exon \
             -i gene_id \
             "$BAM" \
-            "$GTF" > "$COUNT_FILE"
+            "$GTF" > "$COUNT_FILE"; then
+            echo "❌ HTSeq failed — skipping sample"
+            continue
+        fi
 
         echo "✔ Counts generated"
     fi
